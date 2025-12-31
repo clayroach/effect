@@ -46,6 +46,11 @@ export * as Resource from "./Resource.js"
 /**
  * @since 1.0.0
  */
+export * as SpanTree from "./SpanTree.js"
+
+/**
+ * @since 1.0.0
+ */
 export * as Tracer from "./Tracer.js"
 
 /**
