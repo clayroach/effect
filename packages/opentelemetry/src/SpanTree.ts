@@ -202,26 +202,20 @@ export interface SpanTreeStats {
 // ============================================
 
 /**
+ * SpanTree service tag
+ *
+ * @since 1.0.0
+ * @category tags
+ */
+export const SpanTree: typeof internal.SpanTree = internal.SpanTree
+
+/**
  * SpanTree service identifier type
  *
  * @since 1.0.0
  * @category tags
  */
 export type SpanTree = internal.SpanTree
-
-/**
- * SpanTree service tag
- *
- * @since 1.0.0
- * @category tags
- */
-export const SpanTree: internal.SpanTreeTag = internal.SpanTreeTag
-
-/**
- * Type alias for the service tag
- * @internal
- */
-type SpanTreeTag = typeof SpanTree
 
 /**
  * @since 1.0.0

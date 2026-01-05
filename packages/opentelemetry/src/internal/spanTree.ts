@@ -6,7 +6,6 @@
 import * as Chunk from "effect/Chunk"
 import * as Config from "effect/Config"
 import type * as ConfigError from "effect/ConfigError"
-import * as Context from "effect/Context"
 import * as Data from "effect/Data"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
@@ -334,17 +333,10 @@ const estimateMemory = (
 // ============================================
 
 /** @internal */
-export interface SpanTree {
-  readonly _: unique symbol
-}
-
-/** @internal */
-export const SpanTreeTag = Context.GenericTag<SpanTree, SpanTreeServiceInternal>(
-  "@effect/opentelemetry/SpanTree"
-)
-
-/** @internal */
-export type SpanTreeTag = typeof SpanTreeTag
+export class SpanTree extends Effect.Tag("@effect/opentelemetry/SpanTree")<
+  SpanTree,
+  SpanTreeServiceInternal
+>() {}
 
 // ============================================
 // Service Implementation
@@ -623,7 +615,7 @@ const make = (inputConfig?: SpanTreeConfig) =>
 
 /** @internal */
 export const layer = (config?: SpanTreeConfig): Layer.Layer<SpanTree> =>
-  Layer.scoped(SpanTreeTag, make(config))
+  Layer.scoped(SpanTree, make(config))
 
 /** @internal */
 export const spanTreeConfig: Config.Config<SpanTreeConfig> = Config.all({
@@ -649,7 +641,7 @@ export type SpanTreeConfigType = typeof spanTreeConfig
 
 /** @internal */
 export const layerConfig: Layer.Layer<SpanTree, ConfigError.ConfigError> = Layer.scoped(
-  SpanTreeTag,
+  SpanTree,
   Effect.flatMap(Config.unwrap(spanTreeConfig), make)
 )
 
@@ -663,7 +655,7 @@ class SpanTreeSpan implements EffectTracer.Span {
 
   constructor(
     private readonly inner: EffectTracer.Span,
-    private readonly _recordStart: (event: SpanStarted) => boolean,
+    recordStart: (event: SpanStarted) => boolean,
     private readonly _recordEnd: (event: SpanEnded) => boolean
   ) {
     this.status = inner.status
@@ -673,7 +665,7 @@ class SpanTreeSpan implements EffectTracer.Span {
       onSome: (p) => p.spanId
     })
 
-    _recordStart(
+    recordStart(
       new SpanStarted({
         spanId: inner.spanId,
         traceId: inner.traceId,
@@ -747,7 +739,7 @@ class SpanTreeSpan implements EffectTracer.Span {
 /** @internal */
 export const makeTracer: Effect.Effect<EffectTracer.Tracer, never, SpanTree | Tracer.OtelTracer> = Effect.gen(
   function*() {
-    const spanTreeService = yield* SpanTreeTag
+    const spanTreeService = yield* SpanTree
     const innerTracer = yield* Tracer.make
 
     return EffectTracer.make({
@@ -808,7 +800,7 @@ export const layerMetrics = (options?: {
 }): Layer.Layer<never, never, SpanTree> =>
   Layer.scopedDiscard(
     Effect.gen(function*() {
-      const spanTree = yield* SpanTreeTag
+      const spanTree = yield* SpanTree
       const interval = options?.interval ?? Duration.seconds(10)
 
       yield* Effect.gen(function*() {
@@ -834,7 +826,7 @@ export const layerMetrics = (options?: {
 
 /** @internal */
 export const annotateWithSummary: Effect.Effect<void, never, SpanTree> = Effect.gen(function*() {
-  const spanTree = yield* SpanTreeTag
+  const spanTree = yield* SpanTree
   const traceId = yield* spanTree.getCurrentTraceId
 
   if (traceId) {
