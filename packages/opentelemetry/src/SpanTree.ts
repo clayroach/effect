@@ -42,7 +42,7 @@
  */
 import type * as ConfigError from "effect/ConfigError"
 import type * as Duration from "effect/Duration"
-import type * as Effect from "effect/Effect"
+import * as Effect from "effect/Effect"
 import type * as Layer from "effect/Layer"
 import type * as Tracer from "effect/Tracer"
 import * as internal from "./internal/spanTree.js"
@@ -198,24 +198,62 @@ export interface SpanTreeStats {
 }
 
 // ============================================
-// Service
+// Service Interface
 // ============================================
 
 /**
- * SpanTree service tag
+ * SpanTree service interface - the public API for querying span trees
  *
  * @since 1.0.0
- * @category tags
+ * @category models
  */
-export const SpanTree: typeof internal.SpanTree = internal.SpanTree
+export interface SpanTreeService {
+  /** Get the path from root to a specific span */
+  readonly getPath: (spanId: string) => Effect.Effect<ReadonlyArray<string>>
+  /** Get the deepest path in a trace */
+  readonly getDeepestPath: (traceId: string) => Effect.Effect<ReadonlyArray<string>>
+  /** Get the path to the current span */
+  readonly getCurrentPath: Effect.Effect<ReadonlyArray<string>>
+  /** Get a summary of a trace including its deepest path */
+  readonly getTraceSummary: (traceId: string) => Effect.Effect<TraceSummary>
+  /** Get all spans in a trace */
+  readonly getTraceSpans: (traceId: string) => Effect.Effect<ReadonlyArray<SpanInfo>>
+  /** Get leaf spans (spans with no children) in a trace */
+  readonly getLeafSpans: (traceId: string) => Effect.Effect<ReadonlyArray<SpanInfo>>
+  /** Get the maximum depth of a trace */
+  readonly getMaxDepth: (traceId: string) => Effect.Effect<number>
+  /** Get the current trace ID from context */
+  readonly getCurrentTraceId: Effect.Effect<string | null>
+  /** Get the current span ID from context */
+  readonly getCurrentSpanId: Effect.Effect<string | null>
+  /** Get information about a specific span */
+  readonly getSpan: (spanId: string) => Effect.Effect<SpanInfo | undefined>
+  /** Get child spans of a specific span */
+  readonly getChildren: (spanId: string) => Effect.Effect<ReadonlyArray<SpanInfo>>
+  /** Check if a span is still running */
+  readonly isRunning: (spanId: string) => Effect.Effect<boolean>
+  /** Flush pending span events to ensure tree is up-to-date */
+  readonly flush: Effect.Effect<void>
+  /** Get current statistics about the span tree */
+  readonly stats: Effect.Effect<SpanTreeStats>
+  /** Clear all spans for a specific trace */
+  readonly clear: (traceId: string) => Effect.Effect<void>
+}
+
+// ============================================
+// Service Tag
+// ============================================
 
 /**
- * SpanTree service identifier type
+ * SpanTree service tag - use this to access the SpanTree service
  *
  * @since 1.0.0
  * @category tags
  */
-export type SpanTree = internal.SpanTree
+export class SpanTree extends Effect.Tag("@effect/opentelemetry/SpanTree")<
+  SpanTree,
+  SpanTreeService
+>() {}
 
 /**
  * @since 1.0.0
@@ -227,7 +265,7 @@ export declare namespace SpanTree {
    *
    * @since 1.0.0
    */
-  export interface Service extends internal.SpanTreeService {}
+  export interface Service extends SpanTreeService {}
 }
 
 // ============================================

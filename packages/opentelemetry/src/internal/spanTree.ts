@@ -91,7 +91,7 @@ export interface SpanTreeStats {
 }
 
 /**
- * SpanTree service interface
+ * SpanTree service interface - matches the public interface
  * @internal
  */
 export interface SpanTreeService {
@@ -332,11 +332,20 @@ const estimateMemory = (
 // Service Tag
 // ============================================
 
-/** @internal */
+/**
+ * Internal SpanTree tag with extended service interface
+ * @internal
+ */
 export class SpanTree extends Effect.Tag("@effect/opentelemetry/SpanTree")<
   SpanTree,
   SpanTreeServiceInternal
 >() {}
+
+/**
+ * SpanTree tag type for public module re-export
+ * @internal
+ */
+export type SpanTreeTag = typeof SpanTree
 
 // ============================================
 // Service Implementation
