@@ -42,218 +42,24 @@
  */
 import type * as ConfigError from "effect/ConfigError"
 import type * as Duration from "effect/Duration"
-import * as Effect from "effect/Effect"
+import type * as Effect from "effect/Effect"
 import type * as Layer from "effect/Layer"
 import type * as Tracer from "effect/Tracer"
 import * as internal from "./internal/spanTree.js"
 import type { OtelTracer } from "./Tracer.js"
 
-// ============================================
-// Configuration
-// ============================================
-
-/**
- * Configuration options for SpanTree
- *
- * All fields are optional - sensible defaults are provided.
- * Only override the fields you need to customize.
- *
- * @example
- * ```typescript
- * // Use all defaults
- * SpanTree.layer()
- *
- * // Override specific values
- * SpanTree.layer({
- *   ttl: Duration.minutes(1),
- *   maxSpans: 50000
- * })
- * ```
- *
- * @since 1.0.0
- * @category models
- */
-export interface SpanTreeConfig {
-  /**
-   * Keep span data for this duration after trace ends.
-   * Traces are cleaned up after all spans end + this TTL elapses.
-   *
-   * @default Duration.seconds(30)
-   */
-  readonly ttl?: Duration.DurationInput
-
-  /**
-   * Maximum number of spans to track across all traces.
-   * When exceeded, oldest traces are evicted (LRU).
-   *
-   * @default 10000
-   */
-  readonly maxSpans?: number
-
-  /**
-   * Maximum number of traces to track.
-   * When exceeded, oldest traces are evicted (LRU).
-   *
-   * @default 1000
-   */
-  readonly maxTraces?: number
-
-  /**
-   * Event queue capacity for async processing.
-   * Uses sliding strategy - oldest events are dropped when full.
-   * Monitor `span_tree.events.dropped` metric if you see drops.
-   *
-   * @default 1024
-   */
-  readonly queueCapacity?: number
-
-  /**
-   * Batch size for event processing.
-   * Higher values = better throughput, lower values = lower latency.
-   *
-   * @default 100
-   */
-  readonly batchSize?: number
-}
-
-// ============================================
-// Types
-// ============================================
-
-/**
- * Information about a single span in the tree
- *
- * @since 1.0.0
- * @category models
- */
-export interface SpanInfo {
-  readonly spanId: string
-  readonly traceId: string
-  readonly parentSpanId: string | undefined
-  readonly name: string
-  readonly startTime: bigint
-  readonly endTime: bigint | undefined
-  readonly status: "running" | "ended"
-}
-
-/**
- * Summary of a trace including its deepest path
- *
- * @since 1.0.0
- * @category models
- */
-export interface TraceSummary {
-  readonly traceId: string
-  readonly path: ReadonlyArray<string>
-  readonly formattedPath: string
-  readonly depth: number
-  readonly spanCount: number
-}
-
-/**
- * Detailed memory usage statistics for SpanTree
- *
- * These values are estimates based on JS object overhead calculations.
- * Useful for monitoring and capacity planning.
- *
- * @since 1.0.0
- * @category models
- */
-export interface SpanTreeMemoryStats {
-  /** Total estimated memory usage in bytes */
-  readonly totalBytes: number
-  /** Memory used by span records in bytes */
-  readonly spanRecordsBytes: number
-  /** Memory used by trace index in bytes */
-  readonly traceIndexBytes: number
-  /** Memory used by child reference sets in bytes */
-  readonly childRefsBytes: number
-  /** Memory used by event queue (pending events) in bytes */
-  readonly queueBytes: number
-  /** Average bytes per span (for capacity planning) */
-  readonly avgBytesPerSpan: number
-  /** Percentage of max capacity used */
-  readonly capacityPercent: number
-}
-
-/**
- * Statistics for monitoring SpanTree health
- *
- * @since 1.0.0
- * @category models
- */
-export interface SpanTreeStats {
-  /** Number of spans currently tracked */
-  readonly spanCount: number
-  /** Number of traces currently tracked */
-  readonly traceCount: number
-  /** Number of pending events in queue */
-  readonly queueSize: number
-  /** Number of events dropped due to queue overflow */
-  readonly droppedEvents: number
-  /** State version (increments on each change) */
-  readonly version: number
-  /** Detailed memory usage statistics */
-  readonly memory: SpanTreeMemoryStats
-}
-
-// ============================================
-// Service Interface
-// ============================================
-
-/**
- * SpanTree service interface - the public API for querying span trees
- *
- * @since 1.0.0
- * @category models
- */
-export interface SpanTreeService {
-  /** Get the path from root to a specific span */
-  readonly getPath: (spanId: string) => Effect.Effect<ReadonlyArray<string>>
-  /** Get the deepest path in a trace */
-  readonly getDeepestPath: (traceId: string) => Effect.Effect<ReadonlyArray<string>>
-  /** Get the path to the current span */
-  readonly getCurrentPath: Effect.Effect<ReadonlyArray<string>>
-  /** Get a summary of a trace including its deepest path */
-  readonly getTraceSummary: (traceId: string) => Effect.Effect<TraceSummary>
-  /** Get all spans in a trace */
-  readonly getTraceSpans: (traceId: string) => Effect.Effect<ReadonlyArray<SpanInfo>>
-  /** Get leaf spans (spans with no children) in a trace */
-  readonly getLeafSpans: (traceId: string) => Effect.Effect<ReadonlyArray<SpanInfo>>
-  /** Get the maximum depth of a trace */
-  readonly getMaxDepth: (traceId: string) => Effect.Effect<number>
-  /** Get the current trace ID from context */
-  readonly getCurrentTraceId: Effect.Effect<string | null>
-  /** Get the current span ID from context */
-  readonly getCurrentSpanId: Effect.Effect<string | null>
-  /** Get information about a specific span */
-  readonly getSpan: (spanId: string) => Effect.Effect<SpanInfo | undefined>
-  /** Get child spans of a specific span */
-  readonly getChildren: (spanId: string) => Effect.Effect<ReadonlyArray<SpanInfo>>
-  /** Check if a span is still running */
-  readonly isRunning: (spanId: string) => Effect.Effect<boolean>
-  /** Flush pending span events to ensure tree is up-to-date */
-  readonly flush: Effect.Effect<void>
-  /** Get current statistics about the span tree */
-  readonly stats: Effect.Effect<SpanTreeStats>
-  /** Clear all spans for a specific trace */
-  readonly clear: (traceId: string) => Effect.Effect<void>
-}
-
-// ============================================
-// Service Tag
-// ============================================
-
-/**
- * SpanTree service tag - use this to access the SpanTree service
- *
- * @since 1.0.0
- * @category tags
- */
-export class SpanTree extends Effect.Tag("@effect/opentelemetry/SpanTree")<
+// Re-export types and SpanTree class from SpanTreeTag
+export {
   SpanTree,
-  SpanTreeService
->() {}
+  type SpanTreeConfig,
+  type SpanInfo,
+  type TraceSummary,
+  type SpanTreeMemoryStats,
+  type SpanTreeStats,
+  type SpanTreeService
+} from "./SpanTreeTag.js"
+
+import { SpanTree, type SpanTreeConfig, type SpanTreeService } from "./SpanTreeTag.js"
 
 /**
  * @since 1.0.0
