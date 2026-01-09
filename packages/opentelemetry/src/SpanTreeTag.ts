@@ -1,6 +1,7 @@
 /**
  * SpanTree service tag - shared between public and internal modules
  *
+ * @since 1.0.0
  * @internal
  */
 import type * as Duration from "effect/Duration"
