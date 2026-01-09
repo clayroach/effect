@@ -3,8 +3,8 @@
  *
  * @internal
  */
-import * as Effect from "effect/Effect"
 import type * as Duration from "effect/Duration"
+import * as Effect from "effect/Effect"
 
 // ============================================
 // Types

@@ -9,7 +9,7 @@ import type * as ConfigError from "effect/ConfigError"
 import * as Data from "effect/Data"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
+import type * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Metric from "effect/Metric"
 import * as Option from "effect/Option"
@@ -389,8 +389,7 @@ const make = (inputConfig?: SpanTreeConfig) =>
       _recordStart: recordStart,
       _recordEnd: recordEnd,
 
-      getPath: (spanId: string) =>
-        SynchronizedRef.get(state).pipe(Effect.map((s) => computePath(s, spanId))),
+      getPath: (spanId: string) => SynchronizedRef.get(state).pipe(Effect.map((s) => computePath(s, spanId))),
 
       getDeepestPath: (traceId: string) =>
         SynchronizedRef.get(state).pipe(Effect.map((s) => computeDeepestPath(s, traceId))),
@@ -441,9 +440,7 @@ const make = (inputConfig?: SpanTreeConfig) =>
             if (!traceSpans) return []
             return Array.from(traceSpans)
               .map((id) => s.spans.get(id))
-              .filter((record): record is SpanRecord =>
-                record !== undefined && record.children.size === 0
-              )
+              .filter((record): record is SpanRecord => record !== undefined && record.children.size === 0)
               .map(recordToInfo)
           })
         ),
@@ -540,8 +537,7 @@ const make = (inputConfig?: SpanTreeConfig) =>
 // ============================================
 
 /** @internal */
-export const layer = (config?: SpanTreeConfig): Layer.Layer<SpanTree> =>
-  Layer.scoped(SpanTree, make(config))
+export const layer = (config?: SpanTreeConfig): Layer.Layer<SpanTree> => Layer.scoped(SpanTree, make(config))
 
 /** @internal */
 export const spanTreeConfig: Config.Config<SpanTreeConfig> = Config.all({
@@ -769,5 +765,4 @@ export const annotateWithSummary: Effect.Effect<void, never, SpanTree> = Effect.
 /** @internal */
 export const withSummary = <A, E, R>(
   effect: Effect.Effect<A, E, R>
-): Effect.Effect<A, E, R | SpanTree> =>
-  Effect.ensuring(effect, annotateWithSummary)
+): Effect.Effect<A, E, R | SpanTree> => Effect.ensuring(effect, annotateWithSummary)

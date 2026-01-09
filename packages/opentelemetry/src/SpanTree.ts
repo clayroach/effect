@@ -48,18 +48,18 @@ import type * as Tracer from "effect/Tracer"
 import * as internal from "./internal/spanTree.js"
 import type { OtelTracer } from "./Tracer.js"
 
+import type { SpanTree, SpanTreeConfig, SpanTreeService } from "./SpanTreeTag.js"
+
 // Re-export types and SpanTree class from SpanTreeTag
 export {
+  type SpanInfo,
   SpanTree,
   type SpanTreeConfig,
-  type SpanInfo,
-  type TraceSummary,
   type SpanTreeMemoryStats,
+  type SpanTreeService,
   type SpanTreeStats,
-  type SpanTreeService
+  type TraceSummary
 } from "./SpanTreeTag.js"
-
-import { SpanTree, type SpanTreeConfig, type SpanTreeService } from "./SpanTreeTag.js"
 
 /**
  * @since 1.0.0
