@@ -1,6 +1,6 @@
 {
-  "name": "@effect/opentelemetry",
-  "version": "0.60.0",
+  "name": "@clayroach/effect-opentelemetry",
+  "version": "0.60.3",
   "type": "module",
   "license": "MIT",
   "description": "OpenTelemetry integration for Effect",
@@ -33,7 +33,6 @@
   ],
   "publishConfig": {
     "access": "public",
-    "provenance": true,
     "directory": "dist",
     "linkDirectory": false
   },
