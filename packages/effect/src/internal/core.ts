@@ -1495,6 +1495,17 @@ export const withCaptureStackTraces = dual<
     enabled
   ))
 
+/** @internal */
+export const withCaptureOperations = dual<
+  (enabled: boolean) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>,
+  <A, E, R>(effect: Effect.Effect<A, E, R>, enabled: boolean) => Effect.Effect<A, E, R>
+>(2, (effect, enabled) =>
+  fiberRefLocally(
+    effect,
+    currentCaptureOperations,
+    enabled
+  ))
+
 /* @internal */
 export const yieldNow = (options?: {
   readonly priority?: number | undefined
@@ -2174,6 +2185,50 @@ export interface SourceLocation {
   readonly column: number
   readonly functionName?: string
 }
+
+/**
+ * Represents metadata for a high-level Effect operation.
+ * Stored in the `trace` field of Effect primitives when operation tracing is enabled.
+ * The `_tag` field identifies this as operation metadata for use by supervisors.
+ * @internal
+ */
+export interface OperationMeta {
+  readonly _tag: "OperationMeta"   // Tag to identify operation metadata
+  readonly op: string              // Operation name: 'all', 'forEach', 'retry', etc.
+  readonly count?: number          // Item count for all/forEach
+  readonly capturedAt: string      // Stack trace captured at creation time
+}
+
+/**
+ * Creates operation metadata for tracing high-level Effect operations.
+ * @internal
+ */
+export const makeOperationMeta = (
+  op: string,
+  capturedAt: string,
+  count?: number
+): OperationMeta => {
+  const meta: OperationMeta = {
+    _tag: "OperationMeta",
+    op,
+    capturedAt
+  }
+  if (count !== undefined) {
+    (meta as { count?: number }).count = count
+  }
+  return meta
+}
+
+/**
+ * FiberRef that controls whether operation tracing is enabled.
+ * When enabled, high-level operations like Effect.all, Effect.forEach
+ * capture their call site and store metadata in the trace field.
+ * @internal
+ */
+export const currentCaptureOperations: FiberRef.FiberRef<boolean> = globalValue(
+  Symbol.for("effect/FiberRef/currentCaptureOperations"),
+  () => fiberRefUnsafeMake(false)
+)
 
 /**
  * FiberRef that controls whether source location capture is enabled.

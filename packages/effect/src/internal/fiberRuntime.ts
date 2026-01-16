@@ -1969,20 +1969,31 @@ export const all = <
   arg: Arg,
   options?: O
 ): Effect.All.Return<Arg, O> => {
+  // Capture stack trace early (while user code is on stack)
+  const rawStack = new Error().stack ?? ""
+
   const [effects, reconcile] = allResolveInput(arg)
+  const count = Array.isArray(effects) ? effects.length : undefined
+
+  let result: Effect.Effect<any, any, any>
 
   if (options?.mode === "validate") {
-    return allValidate(effects, reconcile, options) as any
+    result = allValidate(effects, reconcile, options) as any
   } else if (options?.mode === "either") {
-    return allEither(effects, reconcile, options) as any
+    result = allEither(effects, reconcile, options) as any
+  } else {
+    result = options?.discard !== true && reconcile._tag === "Some"
+      ? core.map(
+        forEach(effects, identity, options as any),
+        reconcile.value
+      ) as any
+      : forEach(effects, identity, options as any) as any
   }
 
-  return options?.discard !== true && reconcile._tag === "Some"
-    ? core.map(
-      forEach(effects, identity, options as any),
-      reconcile.value
-    ) as any
-    : forEach(effects, identity, options as any) as any
+  // Set operation metadata in trace field for OpSupervision
+  ;(result as any).trace = core.makeOperationMeta("all", rawStack, count)
+
+  return result as Effect.All.Return<Arg, O>
 }
 
 /* @internal */
@@ -2125,8 +2136,12 @@ export const forEach: {
     readonly discard?: boolean | undefined
     readonly concurrentFinalizers?: boolean | undefined
   }
-) =>
-  core.withFiberRuntime<A | void, E, R>((r) => {
+) => {
+  // Capture stack trace early (while user code is on stack)
+  const rawStack = new Error().stack ?? ""
+  const count = Array.isArray(self) ? self.length : undefined
+
+  const result = core.withFiberRuntime<A | void, E, R>((r) => {
     const isRequestBatchingEnabled = options?.batching === true ||
       (options?.batching === "inherit" && r.getFiberRef(core.currentRequestBatching))
 
@@ -2167,7 +2182,13 @@ export const forEach: {
           forEachParN(self, n, (a, i) => restore(f(a, i)), isRequestBatchingEnabled)
         )
     )
-  }))
+  })
+
+  // Set operation metadata in trace field for OpSupervision
+  ;(result as any).trace = core.makeOperationMeta("forEach", rawStack, count)
+
+  return result
+})
 
 /* @internal */
 export const forEachParUnbounded = <A, B, E, R>(
