@@ -3,9 +3,12 @@
  */
 import * as Context from "../Context.js"
 import type * as Exit from "../Exit.js"
+import type * as FiberRef from "../FiberRef.js"
 import { constFalse } from "../Function.js"
+import { globalValue } from "../GlobalValue.js"
 import type * as Option from "../Option.js"
 import type * as Tracer from "../Tracer.js"
+import * as core from "./core.js"
 
 /** @internal */
 export const TracerTypeId: Tracer.TracerTypeId = Symbol.for("effect/Tracer") as Tracer.TracerTypeId
@@ -267,3 +270,24 @@ const parseStackFrame = (frame: string): SourceLocation | undefined => {
     column: parseInt(match[4], 10)
   }
 }
+
+// -----------------------------------------------------------------------------
+// OTel Context Propagation
+// -----------------------------------------------------------------------------
+
+/**
+ * FiberRef for propagating OpenTelemetry span context through Effect's fiber hierarchy.
+ *
+ * When fibers are forked, they inherit this FiberRef's value from their parent.
+ * This allows supervisors to maintain correct parent-child span relationships
+ * even when the OTel AsyncLocalStorage context is lost due to Effect's fiber scheduler.
+ *
+ * The value is typed as `unknown` to avoid a direct dependency on @opentelemetry/api.
+ * Consumers should cast to `OtelApi.Context` when using.
+ *
+ * @internal
+ */
+export const currentOtelSpanContext: FiberRef.FiberRef<unknown> = globalValue(
+  "effect/Tracer/currentOtelSpanContext",
+  () => core.fiberRefUnsafeMake<unknown>(undefined)
+)

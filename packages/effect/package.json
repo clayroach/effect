@@ -1,6 +1,6 @@
 {
   "name": "@clayroach/effect",
-  "version": "3.19.14-source-capture.7",
+  "version": "3.19.14-source-capture.8",
   "type": "module",
   "license": "MIT",
   "description": "The missing standard library for TypeScript, for writing production-grade software.",
