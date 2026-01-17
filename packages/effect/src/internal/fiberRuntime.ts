@@ -2421,9 +2421,9 @@ export const forEachParN = <A, B, E, R>(
 export const fork = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> => {
   // Capture stack trace immediately while user code is on stack
   // Creating Error object is cheap; parsing is delayed until we know capture is enabled
-  const rawStack = new Error().stack
+  const rawStack = new Error().stack ?? ""
 
-  return core.withFiberRuntime((state, status) => {
+  const result: Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> = core.withFiberRuntime((state, status) => {
     // Check if capture is enabled, then parse the pre-captured stack if needed
     const capturedLocation = state.getFiberRef(core.currentCaptureStackTraces) && rawStack
       ? tracer.parseSourceLocationFromStack(rawStack)
@@ -2432,11 +2432,20 @@ export const fork = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<Fiber
     const fiber = unsafeForkWithLocation(self, state, status.runtimeFlags, null, capturedLocation)
     return core.succeed(fiber)
   })
+
+  // Set operation metadata in trace field for OpSupervision
+  ;(result as any).trace = core.makeOperationMeta("fork", rawStack, 1)
+
+  return result
 }
 
 /* @internal */
-export const forkDaemon = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> =>
-  forkWithScopeOverride(self, fiberScope.globalScope)
+export const forkDaemon = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> => {
+  const rawStack = new Error().stack ?? ""
+  const result = forkWithScopeOverride(self, fiberScope.globalScope)
+  ;(result as any).trace = core.makeOperationMeta("forkDaemon", rawStack, 1)
+  return result
+}
 
 /* @internal */
 export const forkWithErrorHandler = dual<
