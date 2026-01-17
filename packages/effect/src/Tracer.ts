@@ -5,6 +5,7 @@ import type * as Context from "./Context.js"
 import type * as Effect from "./Effect.js"
 import type * as Exit from "./Exit.js"
 import type * as Fiber from "./Fiber.js"
+import type * as FiberRef from "./FiberRef.js"
 import type { LazyArg } from "./Function.js"
 import * as defaultServices from "./internal/defaultServices.js"
 import * as internal from "./internal/tracer.js"
@@ -180,3 +181,18 @@ export interface DisablePropagation {
  * @category annotations
  */
 export const DisablePropagation: Context.Reference<DisablePropagation, boolean> = internal.DisablePropagation
+
+/**
+ * FiberRef for propagating OpenTelemetry span context through Effect's fiber hierarchy.
+ *
+ * When fibers are forked, they inherit this FiberRef's value from their parent.
+ * This allows supervisors to maintain correct parent-child span relationships
+ * even when the OTel AsyncLocalStorage context is lost due to Effect's fiber scheduler.
+ *
+ * The value is typed as `unknown` to avoid a direct dependency on @opentelemetry/api.
+ * Consumers should cast to `OtelApi.Context` when using.
+ *
+ * @since 3.20.0
+ * @category otel
+ */
+export const currentOtelSpanContext: FiberRef.FiberRef<unknown> = internal.currentOtelSpanContext

@@ -1484,6 +1484,28 @@ export const withTracerTiming = dual<
     enabled
   ))
 
+/** @internal */
+export const withCaptureStackTraces = dual<
+  (enabled: boolean) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>,
+  <A, E, R>(effect: Effect.Effect<A, E, R>, enabled: boolean) => Effect.Effect<A, E, R>
+>(2, (effect, enabled) =>
+  fiberRefLocally(
+    effect,
+    currentCaptureStackTraces,
+    enabled
+  ))
+
+/** @internal */
+export const withCaptureOperations = dual<
+  (enabled: boolean) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>,
+  <A, E, R>(effect: Effect.Effect<A, E, R>, enabled: boolean) => Effect.Effect<A, E, R>
+>(2, (effect, enabled) =>
+  fiberRefLocally(
+    effect,
+    currentCaptureOperations,
+    enabled
+  ))
+
 /* @internal */
 export const yieldNow = (options?: {
   readonly priority?: number | undefined
@@ -2147,6 +2169,91 @@ export const currentTracerSpanAnnotations: FiberRef.FiberRef<HashMap.HashMap<str
 export const currentTracerSpanLinks: FiberRef.FiberRef<Chunk.Chunk<Tracer.SpanLink>> = globalValue(
   Symbol.for("effect/FiberRef/currentTracerSpanLinks"),
   () => fiberRefUnsafeMake(Chunk.empty())
+)
+
+// -----------------------------------------------------------------------------
+// Source Location Capture
+// -----------------------------------------------------------------------------
+
+/**
+ * Represents a source code location captured from a stack trace.
+ * @internal
+ */
+export interface SourceLocation {
+  readonly file: string
+  readonly line: number
+  readonly column: number
+  readonly functionName?: string
+}
+
+/**
+ * Represents metadata for a high-level Effect operation.
+ * Stored in the `trace` field of Effect primitives when operation tracing is enabled.
+ * The `_tag` field identifies this as operation metadata for use by supervisors.
+ * @internal
+ */
+export interface OperationMeta {
+  readonly _tag: "OperationMeta"   // Tag to identify operation metadata
+  readonly op: string              // Operation name: 'all', 'forEach', 'retry', etc.
+  readonly count?: number          // Item count for all/forEach
+  readonly capturedAt: string      // Stack trace captured at creation time
+}
+
+/**
+ * Creates operation metadata for tracing high-level Effect operations.
+ * @internal
+ */
+export const makeOperationMeta = (
+  op: string,
+  capturedAt: string,
+  count?: number
+): OperationMeta => {
+  const meta: OperationMeta = {
+    _tag: "OperationMeta",
+    op,
+    capturedAt
+  }
+  if (count !== undefined) {
+    (meta as { count?: number }).count = count
+  }
+  return meta
+}
+
+/**
+ * FiberRef that controls whether operation tracing is enabled.
+ * When enabled, high-level operations like Effect.all, Effect.forEach
+ * capture their call site and store metadata in the trace field.
+ * @internal
+ */
+export const currentCaptureOperations: FiberRef.FiberRef<boolean> = globalValue(
+  Symbol.for("effect/FiberRef/currentCaptureOperations"),
+  () => fiberRefUnsafeMake(false)
+)
+
+/**
+ * FiberRef that controls whether source location capture is enabled.
+ * When enabled, `Effect.fork` captures the call site and stores it
+ * in `currentSourceLocation` for use by Supervisors.
+ * @internal
+ */
+export const currentCaptureStackTraces: FiberRef.FiberRef<boolean> = globalValue(
+  Symbol.for("effect/FiberRef/currentCaptureStackTraces"),
+  () => fiberRefUnsafeMake(false)
+)
+
+/**
+ * FiberRef that holds the captured source location for a fiber.
+ * This is set by `Effect.fork` when `currentCaptureStackTraces` is enabled.
+ * Each fiber gets its own location (not propagated to children).
+ * @internal
+ */
+export const currentSourceLocation: FiberRef.FiberRef<SourceLocation | undefined> = globalValue(
+  Symbol.for("effect/FiberRef/currentSourceLocation"),
+  () =>
+    fiberRefUnsafeMake<SourceLocation | undefined>(undefined, {
+      fork: () => undefined, // Don't propagate - each fiber gets its own
+      join: (parent, _) => parent
+    })
 )
 
 // -----------------------------------------------------------------------------
