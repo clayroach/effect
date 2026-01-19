@@ -65,7 +65,11 @@ import { defaultIdGenerator, IdGenerator } from "./IdGenerator.js"
 import * as Prompt from "./Prompt.js"
 import * as Response from "./Response.js"
 import type { SpanTransformer } from "./Telemetry.js"
-import { CurrentSpanTransformer } from "./Telemetry.js"
+import {
+  applyContentAttributes,
+  CurrentSpanTransformer,
+  CurrentTelemetryConfig
+} from "./Telemetry.js"
 import type * as Tool from "./Tool.js"
 import * as Toolkit from "./Toolkit.js"
 
@@ -568,6 +572,11 @@ export const make: (params: ConstructorParams) => Effect.Effect<Service> = Effec
       Effect.map(Option.orElse(() => parentSpanTransformer))
     )
 
+    const parentTelemetryConfig = yield* Effect.serviceOption(CurrentTelemetryConfig)
+    const getTelemetryConfig = Effect.serviceOption(CurrentTelemetryConfig).pipe(
+      Effect.map(Option.orElse(() => parentTelemetryConfig))
+    )
+
     const idGenerator = yield* Effect.serviceOption(IdGenerator).pipe(
       Effect.map(Option.getOrElse(() => defaultIdGenerator))
     )
@@ -592,6 +601,7 @@ export const make: (params: ConstructorParams) => Effect.Effect<Service> = Effec
         Effect.fnUntraced(
           function*(span) {
             const spanTransformer = yield* getSpanTransformer
+            const telemetryConfig = yield* getTelemetryConfig
 
             const providerOptions: Mutable<ProviderOptions> = {
               prompt: Prompt.make(options.prompt),
@@ -603,6 +613,9 @@ export const make: (params: ConstructorParams) => Effect.Effect<Service> = Effec
             const content = yield* generateContent(options, providerOptions)
 
             applySpanTransformer(spanTransformer, content as any, providerOptions)
+            if (Option.isSome(telemetryConfig)) {
+              applyContentAttributes(telemetryConfig.value, span, providerOptions.prompt, providerOptions.tools, content as any)
+            }
 
             return new GenerateTextResponse(content)
           },
@@ -643,6 +656,7 @@ export const make: (params: ConstructorParams) => Effect.Effect<Service> = Effec
         Effect.fnUntraced(
           function*(span) {
             const spanTransformer = yield* getSpanTransformer
+            const telemetryConfig = yield* getTelemetryConfig
 
             const providerOptions: Mutable<ProviderOptions> = {
               prompt: Prompt.make(options.prompt),
@@ -655,6 +669,9 @@ export const make: (params: ConstructorParams) => Effect.Effect<Service> = Effec
             const content = yield* generateContent(options, providerOptions)
 
             applySpanTransformer(spanTransformer, content as any, providerOptions)
+            if (Option.isSome(telemetryConfig)) {
+              applyContentAttributes(telemetryConfig.value, span, providerOptions.prompt, providerOptions.tools, content as any)
+            }
 
             const value = yield* resolveStructuredOutput(content as any, schema)
 
@@ -700,13 +717,14 @@ export const make: (params: ConstructorParams) => Effect.Effect<Service> = Effec
         // Resolve the content stream for the request
         const stream = yield* streamContent(options, providerOptions)
 
-        // Return the stream immediately if there is no span transformer
+        // Return the stream immediately if there is no span transformer or telemetry config
         const spanTransformer = yield* getSpanTransformer
-        if (Option.isNone(spanTransformer)) {
+        const telemetryConfig = yield* getTelemetryConfig
+        if (Option.isNone(spanTransformer) && Option.isNone(telemetryConfig)) {
           return stream
         }
 
-        // Otherwise aggregate generated content and apply the span transformer
+        // Otherwise aggregate generated content and apply transformations
         // when the stream is finished
         let content: Array<Response.StreamPart<Tools>> = []
         return stream.pipe(
@@ -715,7 +733,12 @@ export const make: (params: ConstructorParams) => Effect.Effect<Service> = Effec
             return chunk
           }),
           Stream.ensuring(Effect.sync(() => {
-            spanTransformer.value({ ...providerOptions, response: content as any })
+            if (Option.isSome(spanTransformer)) {
+              spanTransformer.value({ ...providerOptions, response: content as any })
+            }
+            if (Option.isSome(telemetryConfig)) {
+              applyContentAttributes(telemetryConfig.value, span, providerOptions.prompt, providerOptions.tools, content as any)
+            }
           }))
         )
       },
@@ -1093,3 +1116,4 @@ const applySpanTransformer = (
     transformer.value({ ...options, response: response as any })
   }
 }
+
