@@ -60,6 +60,17 @@ export const Interruption: RuntimeFlag = internal.Interruption
 export const OpSupervision: RuntimeFlag = internal.OpSupervision
 
 /**
+ * The operation tracing flag determines whether or not the Effect runtime system
+ * will capture metadata for high-level operations (such as Effect.all, Effect.forEach)
+ * in the trace field. This metadata can be consumed by supervisors via OpSupervision
+ * to enable automatic span creation without manual instrumentation.
+ *
+ * @since 3.10.0
+ * @category constructors
+ */
+export const OperationTracing: RuntimeFlag = internal.OperationTracing
+
+/**
  * The runtime metrics flag determines whether or not the Effect runtime system
  * will collect metrics about the Effect runtime. Use of this flag will have a
  * very small negative impact on performance, but generates very helpful
@@ -161,6 +172,12 @@ export const disableInterruption: Layer.Layer<never> = circular.disableInterrupt
 export const disableOpSupervision: Layer.Layer<never> = circular.disableOpSupervision
 
 /**
+ * @since 3.10.0
+ * @category context
+ */
+export const disableOperationTracing: Layer.Layer<never> = circular.disableOperationTracing
+
+/**
  * @since 2.0.0
  * @category context
  */
@@ -211,6 +228,12 @@ export const enableInterruption: Layer.Layer<never> = circular.enableInterruptio
  * @category context
  */
 export const enableOpSupervision: Layer.Layer<never> = circular.enableOpSupervision
+
+/**
+ * @since 3.10.0
+ * @category context
+ */
+export const enableOperationTracing: Layer.Layer<never> = circular.enableOperationTracing
 
 /**
  * @since 2.0.0
@@ -288,6 +311,15 @@ export const none: RuntimeFlags = internal.none
  * @category getters
  */
 export const opSupervision: (self: RuntimeFlags) => boolean = internal.opSupervision
+
+/**
+ * Returns `true` if the `OperationTracing` `RuntimeFlag` is enabled, `false`
+ * otherwise.
+ *
+ * @since 3.10.0
+ * @category getters
+ */
+export const operationTracing: (self: RuntimeFlags) => boolean = internal.operationTracing
 
 /**
  * Patches a set of `RuntimeFlag`s with a `RuntimeFlagsPatch`, returning the

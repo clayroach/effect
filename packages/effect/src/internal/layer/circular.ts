@@ -132,6 +132,13 @@ export const enableOpSupervision: Layer.Layer<never> = layer.scopedDiscard(
 )
 
 /** @internal */
+export const enableOperationTracing: Layer.Layer<never> = layer.scopedDiscard(
+  fiberRuntime.withRuntimeFlagsScoped(
+    runtimeFlagsPatch.enable(runtimeFlags.OperationTracing)
+  )
+)
+
+/** @internal */
 export const enableRuntimeMetrics: Layer.Layer<never> = layer.scopedDiscard(
   fiberRuntime.withRuntimeFlagsScoped(
     runtimeFlagsPatch.enable(runtimeFlags.RuntimeMetrics)
@@ -163,6 +170,13 @@ export const disableInterruption: Layer.Layer<never> = layer.scopedDiscard(
 export const disableOpSupervision: Layer.Layer<never> = layer.scopedDiscard(
   fiberRuntime.withRuntimeFlagsScoped(
     runtimeFlagsPatch.disable(runtimeFlags.OpSupervision)
+  )
+)
+
+/** @internal */
+export const disableOperationTracing: Layer.Layer<never> = layer.scopedDiscard(
+  fiberRuntime.withRuntimeFlagsScoped(
+    runtimeFlagsPatch.disable(runtimeFlags.OperationTracing)
   )
 )
 

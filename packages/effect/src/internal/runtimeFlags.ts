@@ -24,13 +24,17 @@ export const WindDown: RuntimeFlags.RuntimeFlag = 1 << 4 as RuntimeFlags.Runtime
 export const CooperativeYielding: RuntimeFlags.RuntimeFlag = 1 << 5 as RuntimeFlags.RuntimeFlag
 
 /** @internal */
+export const OperationTracing: RuntimeFlags.RuntimeFlag = 1 << 6 as RuntimeFlags.RuntimeFlag
+
+/** @internal */
 export const allFlags: ReadonlyArray<RuntimeFlags.RuntimeFlag> = [
   None,
   Interruption,
   OpSupervision,
   RuntimeMetrics,
   WindDown,
-  CooperativeYielding
+  CooperativeYielding,
+  OperationTracing
 ]
 
 const print = (flag: RuntimeFlags.RuntimeFlag) => {
@@ -46,6 +50,9 @@ const print = (flag: RuntimeFlags.RuntimeFlag) => {
     }
     case OpSupervision: {
       return "OpSupervision"
+    }
+    case OperationTracing: {
+      return "OperationTracing"
     }
     case Interruption: {
       return "Interruption"
@@ -110,6 +117,9 @@ export const none: RuntimeFlags.RuntimeFlags = make(None)
 
 /** @internal */
 export const opSupervision = (self: RuntimeFlags.RuntimeFlags): boolean => isEnabled(self, OpSupervision)
+
+/** @internal */
+export const operationTracing = (self: RuntimeFlags.RuntimeFlags): boolean => isEnabled(self, OperationTracing)
 
 /** @internal */
 export const render = (self: RuntimeFlags.RuntimeFlags): string => {

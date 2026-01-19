@@ -1969,20 +1969,31 @@ export const all = <
   arg: Arg,
   options?: O
 ): Effect.All.Return<Arg, O> => {
+  // Capture stack trace early (while user code is on stack)
+  const rawStack = new Error().stack ?? ""
+
   const [effects, reconcile] = allResolveInput(arg)
+  const count = Array.isArray(effects) ? effects.length : undefined
+
+  let result: Effect.Effect<any, any, any>
 
   if (options?.mode === "validate") {
-    return allValidate(effects, reconcile, options) as any
+    result = allValidate(effects, reconcile, options) as any
   } else if (options?.mode === "either") {
-    return allEither(effects, reconcile, options) as any
+    result = allEither(effects, reconcile, options) as any
+  } else {
+    result = options?.discard !== true && reconcile._tag === "Some"
+      ? core.map(
+        forEach(effects, identity, options as any),
+        reconcile.value
+      ) as any
+      : forEach(effects, identity, options as any) as any
   }
 
-  return options?.discard !== true && reconcile._tag === "Some"
-    ? core.map(
-      forEach(effects, identity, options as any),
-      reconcile.value
-    ) as any
-    : forEach(effects, identity, options as any) as any
+  // Set operation metadata in trace field for OpSupervision
+  ;(result as any).trace = core.makeOperationMeta("all", rawStack, count)
+
+  return result as Effect.All.Return<Arg, O>
 }
 
 /* @internal */
@@ -2125,8 +2136,12 @@ export const forEach: {
     readonly discard?: boolean | undefined
     readonly concurrentFinalizers?: boolean | undefined
   }
-) =>
-  core.withFiberRuntime<A | void, E, R>((r) => {
+) => {
+  // Capture stack trace early (while user code is on stack)
+  const rawStack = new Error().stack ?? ""
+  const count = Array.isArray(self) ? self.length : undefined
+
+  const result = core.withFiberRuntime<A | void, E, R>((r) => {
     const isRequestBatchingEnabled = options?.batching === true ||
       (options?.batching === "inherit" && r.getFiberRef(core.currentRequestBatching))
 
@@ -2167,7 +2182,13 @@ export const forEach: {
           forEachParN(self, n, (a, i) => restore(f(a, i)), isRequestBatchingEnabled)
         )
     )
-  }))
+  })
+
+  // Set operation metadata in trace field for OpSupervision
+  ;(result as any).trace = core.makeOperationMeta("forEach", rawStack, count)
+
+  return result
+})
 
 /* @internal */
 export const forEachParUnbounded = <A, B, E, R>(
@@ -2397,12 +2418,34 @@ export const forEachParN = <A, B, E, R>(
   })
 
 /* @internal */
-export const fork = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> =>
-  core.withFiberRuntime((state, status) => core.succeed(unsafeFork(self, state, status.runtimeFlags)))
+export const fork = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> => {
+  // Capture stack trace immediately while user code is on stack
+  // Creating Error object is cheap; parsing is delayed until we know capture is enabled
+  const rawStack = new Error().stack ?? ""
+
+  const result: Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> = core.withFiberRuntime((state, status) => {
+    // Check if capture is enabled, then parse the pre-captured stack if needed
+    const capturedLocation = state.getFiberRef(core.currentCaptureStackTraces) && rawStack
+      ? tracer.parseSourceLocationFromStack(rawStack)
+      : undefined
+
+    const fiber = unsafeForkWithLocation(self, state, status.runtimeFlags, null, capturedLocation)
+    return core.succeed(fiber)
+  })
+
+  // Set operation metadata in trace field for OpSupervision
+  ;(result as any).trace = core.makeOperationMeta("fork", rawStack, 1)
+
+  return result
+}
 
 /* @internal */
-export const forkDaemon = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> =>
-  forkWithScopeOverride(self, fiberScope.globalScope)
+export const forkDaemon = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> => {
+  const rawStack = new Error().stack ?? ""
+  const result = forkWithScopeOverride(self, fiberScope.globalScope)
+  ;(result as any).trace = core.makeOperationMeta("forkDaemon", rawStack, 1)
+  return result
+}
 
 /* @internal */
 export const forkWithErrorHandler = dual<
@@ -2437,6 +2480,19 @@ export const unsafeFork = <A, E, R, E2, B>(
 }
 
 /** @internal */
+export const unsafeForkWithLocation = <A, E, R, E2, B>(
+  effect: Effect.Effect<A, E, R>,
+  parentFiber: FiberRuntime<B, E2>,
+  parentRuntimeFlags: RuntimeFlags.RuntimeFlags,
+  overrideScope: fiberScope.FiberScope | null = null,
+  capturedLocation: tracer.SourceLocation | undefined = undefined
+): FiberRuntime<A, E> => {
+  const childFiber = unsafeMakeChildFiberWithLocation(effect, parentFiber, parentRuntimeFlags, overrideScope, capturedLocation)
+  childFiber.resume(effect)
+  return childFiber
+}
+
+/** @internal */
 export const unsafeForkUnstarted = <A, E, R, E2, B>(
   effect: Effect.Effect<A, E, R>,
   parentFiber: FiberRuntime<B, E2>,
@@ -2454,10 +2510,27 @@ export const unsafeMakeChildFiber = <A, E, R, E2, B>(
   parentRuntimeFlags: RuntimeFlags.RuntimeFlags,
   overrideScope: fiberScope.FiberScope | null = null
 ): FiberRuntime<A, E> => {
+  return unsafeMakeChildFiberWithLocation(effect, parentFiber, parentRuntimeFlags, overrideScope, undefined)
+}
+
+/** @internal */
+export const unsafeMakeChildFiberWithLocation = <A, E, R, E2, B>(
+  effect: Effect.Effect<A, E, R>,
+  parentFiber: FiberRuntime<B, E2>,
+  parentRuntimeFlags: RuntimeFlags.RuntimeFlags,
+  overrideScope: fiberScope.FiberScope | null = null,
+  capturedLocation: tracer.SourceLocation | undefined = undefined
+): FiberRuntime<A, E> => {
   const childId = FiberId.unsafeMake()
   const parentFiberRefs = parentFiber.getFiberRefs()
   const childFiberRefs = fiberRefs.forkAs(parentFiberRefs, childId)
   const childFiber = new FiberRuntime<A, E>(childId, childFiberRefs, parentRuntimeFlags)
+
+  // Set pre-captured source location if enabled
+  if (capturedLocation && parentFiber.getFiberRef(core.currentCaptureStackTraces)) {
+    childFiber.setFiberRef(core.currentSourceLocation, capturedLocation)
+  }
+
   const childContext = fiberRefs.getOrDefault(
     childFiberRefs,
     core.currentContext as unknown as FiberRef.FiberRef<Context.Context<R>>

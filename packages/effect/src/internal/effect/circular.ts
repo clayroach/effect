@@ -366,10 +366,16 @@ export const forkAll: {
   }): Effect.Effect<void, never, Effect.Effect.Context<Eff>>
 } = dual((args) => Predicate.isIterable(args[0]), <A, E, R>(effects: Iterable<Effect.Effect<A, E, R>>, options: {
   readonly discard: true
-}): Effect.Effect<void, never, R> =>
-  options?.discard ?
-    core.forEachSequentialDiscard(effects, fiberRuntime.fork) :
-    core.map(core.forEachSequential(effects, fiberRuntime.fork), fiberRuntime.fiberAll))
+}): Effect.Effect<void, never, R> => {
+  const rawStack = new Error().stack ?? ""
+  const effectsArray = Array.from(effects)
+  const count = effectsArray.length
+  const result: Effect.Effect<void | Fiber.Fiber<Array<A>, E>, never, R> = options?.discard ?
+    core.forEachSequentialDiscard(effectsArray, fiberRuntime.fork) :
+    core.map(core.forEachSequential(effectsArray, fiberRuntime.fork), fiberRuntime.fiberAll)
+  ;(result as any).trace = core.makeOperationMeta("forkAll", rawStack, count)
+  return result
+})
 
 /** @internal */
 export const forkIn = dual<
@@ -377,8 +383,9 @@ export const forkIn = dual<
   <A, E, R>(self: Effect.Effect<A, E, R>, scope: Scope.Scope) => Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R>
 >(
   2,
-  (self, scope) =>
-    core.withFiberRuntime((parent, parentStatus) => {
+  <A, E, R>(self: Effect.Effect<A, E, R>, scope: Scope.Scope): Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> => {
+    const rawStack = new Error().stack ?? ""
+    const result: Effect.Effect<Fiber.RuntimeFiber<A, E>, never, R> = core.withFiberRuntime((parent, parentStatus) => {
       const scopeImpl = scope as fiberRuntime.ScopeImpl
       const fiber = fiberRuntime.unsafeFork(self, parent, parentStatus.runtimeFlags, globalScope)
       if (scopeImpl.state._tag === "Open") {
@@ -399,6 +406,9 @@ export const forkIn = dual<
       }
       return core.succeed(fiber)
     })
+    ;(result as any).trace = core.makeOperationMeta("forkIn", rawStack, 1)
+    return result
+  }
 )
 
 /** @internal */
